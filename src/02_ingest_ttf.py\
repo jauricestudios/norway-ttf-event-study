@@ -1,0 +1,41 @@
+from pathlib import Path
+import pandas as pd
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+SOURCE_FILE = (
+    PROJECT_ROOT
+    / "data"
+    / "raw"
+    / "ttf"
+    / "ice_dutch_ttf_futures_2024-07-01_to_2026-09-17.csv"
+)
+
+df = pd.read_csv(SOURCE_FILE)
+
+print(f"Source: {SOURCE_FILE}")
+print(f"Rows: {len(df):,}")
+print(f"Columns: {list(df.columns)}")
+print(df.head())
+# Validate raw source structure
+EXPECTED_COLUMNS = [
+    "Date",
+    "Price",
+    "Open",
+    "High",
+    "Low",
+    "Vol.",
+    "Change %",
+]
+
+if list(df.columns) != EXPECTED_COLUMNS:
+    raise ValueError(
+        f"Unexpected columns.\n"
+        f"Expected: {EXPECTED_COLUMNS}\n"
+        f"Received: {list(df.columns)}"
+    )
+
+if df.empty:
+    raise ValueError("Source file contains no observations.")
+
+print("Raw structure validation: PASS")
