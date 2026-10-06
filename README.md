@@ -475,3 +475,191 @@ The reported percentile-bootstrap interval resamples individual observations and
 The Wilcoxon signed-rank test is not automatically a pure median test without additional assumptions. The Mann–Whitney test assesses rank-based differences and does not automatically test equality of medians.
 
 All results should be interpreted as observational associations, not causal estimates.
+
+
+## Reproducing the analysis
+
+### Current reproducibility status
+
+The repository documents the Python processing and statistical-analysis workflow.
+
+However, it is not currently a fully self-contained reproduction package.
+
+The raw Gassco and TTF source files are stored locally and excluded from Git. The SQL transformations that construct the eligible event universe are also not yet included in the public repository.
+
+A reader can inspect the published code and saved notebook results, but reproducing the complete analysis requires additional data and database preparation.
+
+### 1. Software requirements
+
+The published Python scripts and notebooks use:
+
+- Python
+- pandas
+- NumPy
+- SciPy
+- Matplotlib
+- Jupyter
+- openpyxl for reading Excel files
+
+PostgreSQL and the `psql` command-line client are required for event-database queries.
+
+The repository does not yet provide a tested, version-pinned Python environment.
+
+For an initial local setup, install the required Python packages:
+
+```bash
+python -m pip install pandas numpy scipy matplotlib jupyter openpyxl
+```
+
+This is an installation example, not a verified dependency lockfile.
+
+### 2. Required local input files
+
+The Gassco ingestion script expects:
+
+```text
+data/raw/gassco/
+├── gassco_umm_unplanned_2024.xlsx
+├── gassco_umm_unplanned_2025.xlsx
+└── gassco_umm_unplanned_2026.xlsx
+```
+
+The TTF ingestion script and validation notebook expect:
+
+```text
+data/raw/ttf/
+└── ice_dutch_ttf_futures_2024-07-01_to_2026-09-17.csv
+```
+
+The exact input filenames and folder structure are currently defined in the code.
+
+The TTF CSV is expected to contain the vendor fields:
+
+`Date`, `Price`, `Open`, `High`, `Low`, `Vol.`, `Change %`.
+
+These input files are not redistributed in this repository.
+
+The `.gitignore` file excludes the local `data/` directory.
+
+### 3. Gassco data ingestion
+
+From the project root, run:
+
+```bash
+python src/01_ingest_gassco.py
+```
+
+The script reads the three Excel source files, standardises the analytical fields and writes:
+
+`data/staging/gassco_umm_import.csv`
+
+The staging file is an input to the local database workflow.
+
+**Current limitation:** The public repository does not yet provide the complete SQL needed to load, reconstruct and validate the final eligible event universe from this staging file.
+
+### 4. TTF data validation
+
+The initial source-validation script can be run using:
+
+```bash
+python src/02_ingest_ttf.py
+```
+
+This script checks the expected source columns, date parsing, duplicate dates and missing values.
+
+It does not currently create the final processed TTF dataset.
+
+The full validation and processing workflow is contained in:
+
+`notebooks/02_ttf_validation.ipynb`
+
+That notebook produces:
+
+`data/processed/ttf_daily_validated.csv`
+
+The saved analysis reports 591 validated daily observations.
+
+### 5. PostgreSQL event universe
+
+The event-alignment notebook connects to the local PostgreSQL database:
+
+`norway_ttf`
+
+It queries the existing relation:
+
+`mart.gassco_primary_reduction_events`
+
+The published notebook expects this table to contain the reconstructed and eligible first-revision Gassco announcements.
+
+In the saved analysis, the table contains:
+
+- 166 records;
+- 166 distinct event keys;
+- 166 distinct message IDs;
+- no missing publication timestamps;
+- no missing operational start timestamps;
+- no missing outage-size values.
+
+These checks establish the properties of the existing analytical table. They do not independently reproduce its upstream construction.
+
+Rebuilding this database table from the original source files remains a separate task.
+
+### 6. Event alignment
+
+Once the validated TTF dataset and PostgreSQL event table are available, run:
+
+`notebooks/03_event_alignment.ipynb`
+
+The notebook queries PostgreSQL through the `psql` command-line client and aligns eligible announcements to observed market dates.
+
+It generates:
+
+```text
+data/processed/
+├── gassco_ttf_event_windows_announcement_level.csv
+├── gassco_ttf_event_windows_unique_anchors.csv
+└── gassco_ttf_event_windows_nonoverlap.csv
+```
+
+The saved notebook outputs report:
+
+- 166 announcement-level observations;
+- 130 unique market anchors;
+- 82 chronologically spaced anchors.
+
+### 7. Statistical analysis
+
+Run:
+
+`notebooks/04_event_study.ipynb`
+
+The notebook requires the processed event-alignment datasets and the original TTF CSV for benchmark construction.
+
+It calculates descriptive return statistics, event-versus-non-event comparisons, outage-size relationships, publication-timing comparisons and non-parametric tests.
+
+The saved analysis reports:
+
+| Check | Expected saved result |
+|---|---:|
+| Unique event anchors | 130 |
+| Spaced event anchors | 82 |
+| Median [0,+1] return (spaced sample) | +0.057% |
+| Wilcoxon p-value | 0.689 |
+| Spearman correlation | +0.050 |
+| Mann-Whitney p-value | 0.496 |
+
+These values are reference results from the existing notebooks, not guarantees that an independently reconstructed input dataset will produce identical outputs.
+
+### 8. Remaining reproducibility work
+
+Before the repository can support a complete independent rerun, the following work is required:
+
+1. Publish the SQL schema, event-reconstruction transformations and eligibility rules.
+2. Provide an input-data dictionary and documented source requirements.
+3. Add a tested, version-pinned Python dependency file.
+4. Add executable validation checks for the 166, 130 and 82 observation counts.
+5. Record the Python, PostgreSQL and package versions used for the final analysis.
+6. Archive the source-data versions and processing assumptions, subject to redistribution rights.
+
+The current repository should therefore be treated as a documented research workflow with partially reproducible components, rather than a fully automated end-to-end pipeline.
+
