@@ -111,3 +111,89 @@ The event-alignment notebook queries the local `norway_ttf` PostgreSQL database.
 The public repository currently documents the downstream analysis but does not contain all SQL transformations needed to reconstruct the eligible event universe from the original staged records.
 
 This is an important reproducibility limitation and will be addressed separately.
+
+
+
+## Data engineering and event reconstruction
+
+### 1. Source ingestion
+
+The project begins with three Gassco Excel files containing historical unplanned outage messages from 2024, 2025 and 2026.
+
+The ingestion script reads the `Past Events` worksheet from each file and standardises 18 source columns.
+
+The combined source dataset contains 376 outage messages.
+
+The ingestion process:
+
+- standardises text fields and removes surrounding whitespace;
+- converts publication, start and stop fields to timestamps;
+- converts capacity fields to numeric values;
+- retains the source year, filename and original Excel row;
+- exports the cleaned dataset as a CSV for database ingestion.
+
+The original Excel files are preserved separately from the cleaned staging data.
+
+### 2. Event reconstruction in PostgreSQL
+
+A Gassco message is not necessarily a new outage.
+
+Messages may contain revisions to previously reported events, changes in available capacity or updates to operational periods.
+
+Consequently, the event study requires an event-selection process before market returns can be analysed.
+
+The PostgreSQL workflow distinguishes initial announcements from later revisions and applies eligibility rules to identify the primary sample of first-revision unplanned capacity reductions.
+
+The downstream event-alignment notebook queries:
+
+`mart.gassco_primary_reduction_events`
+
+This table contains 166 eligible first-revision reduction announcements.
+
+The complete SQL used to construct this table is not yet included in the public repository. Its upstream selection rules therefore cannot currently be independently reproduced from the published code.
+
+### 3. Event-universe validation
+
+Before attaching market prices, the event-alignment notebook checks the resulting PostgreSQL table.
+
+| Validation measure | Result |
+|---|---:|
+| Eligible event records | 166 |
+| Distinct event keys | 166 |
+| Distinct message IDs | 166 |
+| Missing publication timestamps | 0 |
+| Missing operational start timestamps | 0 |
+| Missing outage-size values | 0 |
+
+All 166 records are classified as revision 1.
+
+The eligible publication dates run from 3 September 2024 to 31 August 2026.
+
+### 4. Publication timing
+
+The operational start of an outage is not necessarily the point at which the information becomes public.
+
+The eligible announcements are classified as follows:
+
+| Publication timing | Announcements |
+|---|---:|
+| After reported operational start | 110 |
+| Before or at operational start | 56 |
+| Total | 166 |
+
+The analysis therefore retains two distinct timestamps:
+
+- `publication_time`: when the outage information was reported;
+- `event_start`: when the operational disruption reportedly began.
+
+The first is used as the conceptual information-event timestamp for market alignment.
+
+This distinction is necessary because an event study based only on operational start times could incorrectly associate earlier price movements with information that had not yet been published.
+
+### 5. Data-quality boundary
+
+The checks establish that the selected event table has unique identifiers and complete values for its principal analytical fields.
+
+They do not independently prove that every underlying capacity value is economically correct or that the original SQL eligibility classifications are free from error.
+
+Publishing the complete SQL transformation and exclusion audit is therefore a remaining reproducibility task.
