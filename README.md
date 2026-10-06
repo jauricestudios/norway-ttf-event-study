@@ -196,4 +196,153 @@ The checks establish that the selected event table has unique identifiers and co
 
 They do not independently prove that every underlying capacity value is economically correct or that the original SQL eligibility classifications are free from error.
 
+
+## Event-study methodology
+
+### 1. Aligning announcements with TTF observations
+
+The eligible event dataset contains 166 first-revision Gassco outage announcements.
+
+The analysis uses `publication_time` as the information-event timestamp, rather than the reported physical outage start.
+
+The TTF dataset contains 591 unique daily observations between 1 July 2024 and 17 September 2026.
+
+Each TTF observation is assigned a sequential index based on its position in the validated market series.
+
+Announcements are aligned to the first observed TTF date on or after their publication date.
+
+| Alignment outcome | Announcements |
+|---|---:|
+| Same-date TTF observation | 117 |
+| Forward-aligned by 1 calendar day | 30 |
+| Forward-aligned by 2 calendar days | 18 |
+| Forward-aligned by 3 calendar days | 1 |
+| **Total** | **166** |
+
+The alignment uses the dates actually present in the vendor dataset rather than assuming a standard Monday-to-Friday trading calendar.
+
+**Important limitation:** Calendar-date alignment does not establish whether an announcement occurred before or after the relevant market-price observation.
+
+The vendor's price timestamp and the timezone of Gassco publication timestamps have not been independently verified.
+
+Consequently, the resulting event windows measure movements around assigned market dates rather than isolated announcement-time price reactions.
+
+### 2. Constructing return windows
+
+For each aligned announcement, the notebook identifies the surrounding observed TTF prices.
+
+Let:
+
+- `P[-1]` denote the previous observed price;
+- `P[0]` denote the assigned anchor-date price;
+- `P[+1]` denote the next observed price;
+- `P[+2]` denote the second subsequent observed price.
+
+The following log-return windows are constructed:
+
+| Window | Definition | Interpretation |
+|---|---|---|
+| [-1,0] | ln(P[0] / P[-1]) | Movement into the anchor observation |
+| [0,+1] | ln(P[+1] / P[0]) | Movement after the anchor observation |
+| [-1,+1] | ln(P[+1] / P[-1]) | Wider two-interval response |
+| [0,+2] | ln(P[+2] / P[0]) | Extended post-anchor response |
+
+Returns are stored as decimal log returns and multiplied by 100 when reported as percentages.
+
+The primary reported outcome is the [0,+1] return.
+
+This choice measures the movement after the assigned anchor price. It does not guarantee that the full market reaction to a disclosure is captured.
+
+For example, if an announcement was already reflected in the anchor-date closing price, part of the price adjustment would occur before the [0,+1] window begins.
+
+The wider windows are retained as complementary descriptive specifications.
+
+### 3. Consolidating announcements into market anchors
+
+Multiple eligible Gassco announcements can map to the same TTF price date.
+
+The 166 announcements correspond to 130 unique market anchors.
+
+Of these:
+
+- 108 anchors contain one announcement;
+- 13 anchors contain two announcements;
+- 6 anchors contain three announcements;
+- 2 anchors contain four announcements;
+- 1 anchor contains six announcements.
+
+In total, 22 anchors contain multiple announcements, representing 58 individual disclosures.
+
+Because announcements assigned to the same anchor share the same TTF return window, treating them as independent market observations would duplicate price movements.
+
+The analysis therefore separates:
+
+**Announcement-level observations (166):** Used to examine outage characteristics, publication timing and event composition.
+
+**Unique market anchors (130):** Used to examine distinct market-return observations without counting identical price windows repeatedly.
+
+This distinction prevents announcement counts from being confused with independent market-price observations.
+
+### 4. Identifying overlapping event windows
+
+Even after consolidating announcements onto unique market dates, neighbouring event windows may overlap.
+
+The wider [-1,+1] window uses the return intervals immediately before and after each anchor.
+
+If two anchors are separated by only one or two observed TTF price intervals, their wider response windows share at least one return interval.
+
+The notebook therefore constructs an additional spaced sample.
+
+The selection algorithm:
+
+1. Sort the 130 unique anchors by their TTF observation index.
+2. Retain the earliest anchor.
+3. Examine each subsequent anchor in chronological order.
+4. Retain it only if its index is at least three observations after the previously retained anchor.
+5. Continue until all 130 anchors have been evaluated.
+
+This produces:
+
+| Sample | Observations |
+|---|---:|
+| Unique market anchors | 130 |
+| Retained spaced anchors | 82 |
+| Excluded by spacing rule | 48 |
+
+The rule removes mechanically shared return intervals between retained [-1,+1] windows.
+
+It does not establish statistical independence between different outages or market periods.
+
+### 5. Sample-selection implications
+
+The 82-anchor sample is a robustness specification rather than a separate definition of a valid outage event.
+
+Its composition depends on the chronological selection algorithm.
+
+The earliest eligible anchor is retained when neighbouring event windows conflict, regardless of which announcement is more economically significant.
+
+Consequently, the selected sample may differ from the full 130-anchor population in outage severity, infrastructure composition, publication timing or prevailing market conditions.
+
+The analysis therefore retains both datasets:
+
+- 130 unique anchors for descriptive market-response analysis;
+- 82 spaced anchors for exploratory statistical inference with mechanical return-window overlap reduced.
+
+Formal statistical tests on the 82 observations should not automatically be interpreted as representative of all Norwegian outage announcements.
+
+### 6. Output datasets
+
+The event-alignment notebook saves three processed datasets:
+
+`data/processed/gassco_ttf_event_windows_announcement_level.csv`
+
+`data/processed/gassco_ttf_event_windows_unique_anchors.csv`
+
+`data/processed/gassco_ttf_event_windows_nonoverlap.csv`
+
+These datasets provide the inputs for `notebooks/04_event_study.ipynb`.
+
+The processed files are generated locally and are not all included in the public repository.
+
+
 Publishing the complete SQL transformation and exclusion audit is therefore a remaining reproducibility task.
