@@ -346,3 +346,132 @@ The processed files are generated locally and are not all included in the public
 
 
 Publishing the complete SQL transformation and exclusion audit is therefore a remaining reproducibility task.
+
+
+## Empirical results
+
+The analysis examines whether Norwegian outage announcements are associated with systematic movements in near-term TTF futures prices.
+
+Results are separated into the full 130-anchor descriptive sample and the 82-anchor spaced sample used for exploratory statistical inference.
+
+### 1. Post-anchor return distribution
+
+Across 130 unique market anchors, the median [0,+1] log return is +0.279%.
+
+The 82-anchor spaced sample produces:
+
+| Statistic | Result |
+|---|---:|
+| Observations | 82 |
+| Mean return | +0.098% |
+| Median return | +0.057% |
+| Standard deviation | 3.107% |
+| Reported 95% bootstrap interval for median | -0.526% to +0.925% |
+| Wilcoxon signed-rank statistic | 1615 |
+| Wilcoxon p-value | 0.689 |
+
+The median is close to zero, while the distribution contains substantial positive and negative movements.
+
+The percentile-bootstrap interval was calculated using 10,000 resamples of the 82 observations.
+
+The Wilcoxon test does not reject its null hypothesis at conventional significance levels.
+
+This does not prove that the true market response is zero. The test examines the distribution of selected daily returns, not an isolated causal announcement effect.
+
+![Distribution of post-anchor TTF returns](https://raw.githubusercontent.com/jauricestudios/jauricestudios.github.io/main/norway_ttf_event_study/charts/ttf_post_announcement_return_distribution.png)
+
+*Figure 1. Distribution of post-anchor TTF returns in the spaced event sample.*
+
+### 2. Outage magnitude and TTF returns
+
+The second analysis examines whether the largest individual announced capacity reduction at each market anchor is associated with subsequent signed returns.
+
+The analysis uses Spearman's rank correlation to measure monotonic association.
+
+| Sample | Spearman correlation |
+|---|---:|
+| 130 unique anchors | -0.006 |
+| 82 spaced anchors | +0.050 |
+
+For the 82-anchor sample, the reported p-value is 0.656.
+
+The estimated monotonic association is close to zero in both samples.
+
+![Outage magnitude versus TTF returns](https://raw.githubusercontent.com/jauricestudios/jauricestudios.github.io/main/norway_ttf_event_study/charts/outage_magnitude_vs_ttf_return.png)
+
+*Figure 2. Largest individual communicated outage magnitude against the subsequent signed TTF return.*
+
+Announced unavailable capacity is not necessarily the unexpected reduction in aggregate Norwegian gas supply.
+
+The results therefore cannot establish whether market prices respond to genuinely unexpected supply shocks.
+
+### 3. Publication timing
+
+The third analysis compares market returns according to whether the largest outage announcement associated with an anchor was published before or after the reported operational start.
+
+For the 82-anchor sample:
+
+| Publication timing | Observations | Median return |
+|---|---:|---:|
+| Published after operational start | 59 | -0.246% |
+| Published before or at operational start | 23 | +0.753% |
+
+The Mann–Whitney U statistic is 612, with a p-value of 0.496.
+
+This provides little evidence of systematic rank separation between the two groups.
+
+The comparison concerns publication relative to operational start, not publication relative to the verified TTF market closing time.
+
+### 4. Event versus non-event market movements
+
+The analysis also investigates whether returns around outage-associated market dates are unusually large compared with selected non-event observations.
+
+For the primary [0,+1] return window:
+
+| Sample | Observations | Mean absolute return |
+|---|---:|---:|
+| Unique event anchors | 130 | 2.398% |
+| Selected non-event observations | 301 | 2.719% |
+
+The non-event sample excludes observations whose return windows overlap the event-date contamination rule.
+
+In this exploratory comparison, event-associated dates do not show larger average absolute returns.
+
+However, the comparison is not a matched counterfactual.
+
+The event and non-event samples differ in calendar composition and may experience different volatility regimes or contemporaneous market information.
+
+The result therefore does not establish that Norwegian outage announcements reduce volatility.
+
+A separate local-control exercise also identified repeated use of benchmark dates, with some control observations assigned as many as 12 times. Such reuse creates additional dependence that must be considered before formal event-versus-control inference.
+
+### 5. Interpretation
+
+The analysis does not detect a consistent unconditional directional return across the selected event windows.
+
+It also finds little evidence of a monotonic relationship between the largest communicated outage and the subsequent signed return.
+
+These findings are compatible with market responses depending on information that the present dataset does not directly measure, including:
+
+- the unexpected change in net Norwegian supply;
+- whether the outage was anticipated;
+- affected infrastructure and alternative supply routes;
+- prevailing European gas balances;
+- wider LNG, storage and weather conditions;
+- other information arriving during the return window.
+
+These explanations remain hypotheses rather than demonstrated drivers of the observed returns.
+
+The principal contribution of the project is therefore its structured reconstruction and alignment of operational disclosures with market observations, together with an explicit assessment of what the resulting daily returns can and cannot establish.
+
+### Statistical qualifications
+
+The formal tests are exploratory.
+
+The 82-anchor selection removes mechanically shared return intervals but does not guarantee independent observations.
+
+The reported percentile-bootstrap interval resamples individual observations and is not adjusted for possible dependence across market regimes or related outage episodes.
+
+The Wilcoxon signed-rank test is not automatically a pure median test without additional assumptions. The Mann–Whitney test assesses rank-based differences and does not automatically test equality of medians.
+
+All results should be interpreted as observational associations, not causal estimates.
