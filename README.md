@@ -46,6 +46,16 @@ These are observational findings, not estimates of the causal price impact of No
 ```text
 norway-ttf-event-study/
 ├── README.md
+├── requirements.txt
+├── sql/
+│   ├── 00_create_schemas.sql
+│   └── gassco_event_pipeline.sql
+├── scripts/
+│   ├── check_environment.py
+│   ├── check_gassco_csv.py
+│   └── load_gassco_csv.sh
+├── docs/ttf_series_provenance.md
+├── tests/
 ├── src/
 │   ├── 01_ingest_gassco.py
 │   └── 02_ingest_ttf.py
@@ -108,9 +118,7 @@ This includes:
 
 The event-alignment notebook queries the local `norway_ttf` PostgreSQL database.
 
-The public repository currently documents the downstream analysis but does not contain all SQL transformations needed to reconstruct the eligible event universe from the original staged records.
-
-This is an important reproducibility limitation and will be addressed separately.
+The published `sql/gassco_event_pipeline.sql` includes the staging-table definition and SQL views that derive the audited Gassco events and `mart.gassco_primary_reduction_events`. `sql/00_create_schemas.sql` creates their schemas. The private source Excel files and TTF CSV remain excluded; an independent end-to-end replay still requires these and a compatible PostgreSQL setup. See the guarded test-database loader and preflight commands below.
 
 
 
@@ -150,7 +158,7 @@ The downstream event-alignment notebook queries:
 
 This table contains 166 eligible first-revision reduction announcements.
 
-The complete SQL used to construct this table is not yet included in the public repository. Its upstream selection rules therefore cannot currently be independently reproduced from the published code.
+The SQL defining this view is published in `sql/gassco_event_pipeline.sql`; it can be inspected and replayed with appropriately licensed source inputs. The full upstream data and independent regeneration of the saved notebook counts have not been revalidated as part of this documentation update.
 
 ### 3. Event-universe validation
 
@@ -345,7 +353,7 @@ These datasets provide the inputs for `notebooks/04_event_study.ipynb`.
 The processed files are generated locally and are not all included in the public repository.
 
 
-Publishing the complete SQL transformation and exclusion audit is therefore a remaining reproducibility task.
+The original SQL event-reconstruction views are now published. A versioned, independently replayed row-level exclusion ledger and input-data snapshot remain reproducibility tasks.
 
 
 ## Empirical results
@@ -485,7 +493,7 @@ The repository documents the Python processing and statistical-analysis workflow
 
 However, it is not currently a fully self-contained reproduction package.
 
-The raw Gassco and TTF source files are stored locally and excluded from Git. The SQL transformations that construct the eligible event universe are also not yet included in the public repository.
+The raw Gassco and TTF source files are stored locally and excluded from Git. The source-to-eligible-event SQL views are published, but rerunning them requires the undistributed files, a PostgreSQL database and the documented execution steps.
 
 A reader can inspect the published code and saved notebook results, but reproducing the complete analysis requires additional data and database preparation.
 
@@ -503,15 +511,17 @@ The published Python scripts and notebooks use:
 
 PostgreSQL and the `psql` command-line client are required for event-database queries.
 
-The repository does not yet provide a tested, version-pinned Python environment.
+The repository provides `requirements.txt` with **compatible ranges**, not a fully frozen or cross-platform tested lockfile. Python 3.10+ and a compatible PostgreSQL server plus `psql` CLI are required. The committed SQL dump came from PostgreSQL 18.6; earlier client/server versions have not been qualified.
 
-For an initial local setup, install the required Python packages:
+From the project root, run:
 
 ```bash
-python -m pip install pandas numpy scipy matplotlib jupyter openpyxl
+python3 -m pip install -r requirements.txt
+python3 scripts/check_environment.py --check-inputs
+python3 -m unittest discover -s tests -v
 ```
 
-This is an installation example, not a verified dependency lockfile.
+The environment preflight checks Python dependencies, `psql`, and, when requested, private raw inputs; unit/smoke tests do not replace a database integration test.
 
 ### 2. Required local input files
 
@@ -555,7 +565,18 @@ The script reads the three Excel source files, standardises the analytical field
 
 The staging file is an input to the local database workflow.
 
-**Current limitation:** The public repository does not yet provide the complete SQL needed to load, reconstruct and validate the final eligible event universe from this staging file.
+**Database test-loader (guarded; will not load production):**
+
+```bash
+# Create a new, empty disposable database (one-time setup).
+createdb norway_ttf_script_test
+psql -X -v ON_ERROR_STOP=1 -d norway_ttf_script_test -f sql/00_create_schemas.sql
+psql -X -v ON_ERROR_STOP=1 -d norway_ttf_script_test -f sql/gassco_event_pipeline.sql
+python3 scripts/check_gassco_csv.py data/staging/gassco_umm_import.csv
+bash scripts/load_gassco_csv.sh norway_ttf_script_test
+```
+
+The shell loader allows only database names ending `_test`, rejects a nonempty `raw.gassco_umm_import`, locks the table, uses client-side `\copy` inside a transaction and reports raw/eligible counts. A documented earlier local run returned `COPY 376`, `raw_messages=376` and `eligible_reductions=166`; a repeat load refused the occupied table. **These historical results have not been freshly reproduced against the user's private database in this documentation update.** Do not run the test-only script on `norway_ttf` or assume it is a production migration system.
 
 ### 4. TTF data validation
 
@@ -654,12 +675,19 @@ These values are reference results from the existing notebooks, not guarantees t
 
 Before the repository can support a complete independent rerun, the following work is required:
 
-1. Publish the SQL schema, event-reconstruction transformations and eligibility rules.
-2. Provide an input-data dictionary and documented source requirements.
-3. Add a tested, version-pinned Python dependency file.
-4. Add executable validation checks for the 166, 130 and 82 observation counts.
-5. Record the Python, PostgreSQL and package versions used for the final analysis.
-6. Archive the source-data versions and processing assumptions, subject to redistribution rights.
+1. Archive source versions and add a data dictionary, with redistribution restricted by vendor rights.
+2. Independently replay and archive the full eligible-event and exclusion ledger from source files, then freeze result IDs.
+3. Add executable end-to-end tests for the 166, 130 and 82 observation counts using licensed inputs and a compatible PostgreSQL environment.
+4. Freeze the exact Python, PostgreSQL and package versions after independent rerun; `requirements.txt` is not a lockfile.
+5. **Resolve the TTF-series provenance gate:** identify each historical delivery contract, vendor close/settlement field, quote time/timezone and vendor roll/back-adjustment construction; confirm Gassco publication timezone, Sunday/calendar handling and pre-disclosure observability. See `docs/ttf_series_provenance.md`.
+6. Only after the market-data mapping is sound should the research extend to reported outages versus realised Norwegian flow loss.
 
 The current repository should therefore be treated as a documented research workflow with partially reproducible components, rather than a fully automated end-to-end pipeline.
 
+
+
+### Market-data interpretation gate (5 November 2026)
+
+The daily TTF export is **Investing.com-labelled `TFMBMc1` vendor history**, not a verified ICE official settlement archive or an established fixed-contract return series. Its `Price` is labelled a daily close; the exact historic quote clock, Gassco publication timezone, per-date delivery month and continuous-roll/back-adjustment method remain unresolved. Sunday-labelled observations must not be silently dropped or treated as ordinary weekday settlements. Full evidence, sources and next checks: [`docs/ttf_series_provenance.md`](docs/ttf_series_provenance.md).
+
+**Interpret the current results as exploratory calendar-date vendor-price associations, not announcement-time causal impacts or a tradeable signal. The reported-outage versus realised Norwegian flow-loss extension is deliberately deferred pending this audit.**
